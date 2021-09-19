@@ -1,0 +1,34 @@
+# first stage
+FROM python:3.8 AS builder
+
+COPY project/requirements.txt .
+
+# install dependencies to the local user directory (eg. /root/.local)
+RUN pip install --user -r requirements.txt
+
+# second unnamed stage
+FROM python:3.8-slim
+# set the working directory in the container
+WORKDIR /code
+
+## CREATE APP USER ##
+
+# Create the home directory for the new app user.
+RUN mkdir -p /home/app
+
+# Create an app user so our program doesn't run as root.
+RUN groupadd -r app &&\
+    useradd -r -g app -d /home/app -s /sbin/nologin -c "Docker image user" app
+
+# Set the home directory to our app user's home.
+ENV HOME=/home/app
+ENV APP_HOME=/home/app/fastapi    
+
+# copy only the dependencies installation from the 1st stage image
+COPY --from=builder /root/.local /home/app/fastapi/.local
+COPY ./project/app .
+
+# update PATH environment variable
+ENV PATH=/home/app/fastapi/.local:$PATH
+
+CMD [ "python", "./server.py" ]
